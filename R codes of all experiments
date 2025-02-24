@@ -1,0 +1,354 @@
+#Reading the data into R
+Rawgerman=read.csv("German credit Data/Rawgerman1.csv")
+install.packages("tidyverse")
+library(caret)
+library(tidyverse)
+library(ggplot2)
+glimpse(Rawgerman)
+glimpse(processed_data)
+# Assuming the German credit data is already loaded as Rawgerman
+
+# Separate categorical and numerical columns
+categorical_data <- Rawgerman[sapply(Rawgerman, is.factor) | sapply(Rawgerman, is.character)]
+numerical_data <- Rawgerman[sapply(Rawgerman, is.numeric)]
+head(categorical_data)
+head(numerical_data)
+
+##############################################################################################
+# Convert all categorical columns to numeric encoding
+categorical_data <- lapply(categorical_data, function(x) as.numeric(factor(x)))
+# Combine the encoded categorical data and numerical data back into a single data frame
+processed_data <- cbind(as.data.frame(categorical_data), numerical_data)
+processed_data1 <- processed_data[, !names(processed_data) %in% "creditRisks"]
+#separate categorical data
+processed_cat1 <- cbind(as.data.frame(categorical_data))
+# Sorting each dataframe
+sorted_categorical <- categorical_data[ , order(names(categorical_data))]
+sorted_numerical <- numerical_data[ , order(names(numerical_data))]
+# Keep only the 'creditRisks' column
+target_variable<- processed_data[, names(processed_data) %in% "creditRisks", drop = FALSE]
+#
+                           # Load necessary library
+library(e1071)
+library(caTools)
+
+# Set a seed for reproducibility
+set.seed(123)
+
+# Split the data into training and validation sets (80/20 split)
+split <- sample.split(selected_featuresA$creditRisks, SplitRatio = 0.8)
+training_data <- subset(selected_featuresA, split == TRUE)
+validation_data <- subset(selected_featuresA, split == FALSE)
+
+# Fit the multiple linear regression model using the training data
+unproc_Model <- lm(creditRisks ~ ., data = training_data)
+
+# Predict on the validation data
+predictions <- predict(unproc_Model, newdata = validation_data, type = 'response')
+
+# Convert predictions into binary classes based on a threshold (1.5 used here)
+# Assumes 1 = "Good" (Low Risk) and 2 = "Bad" (High Risk)
+threshold <- 1.5
+predicted_classes <- ifelse(predictions >= threshold, 2, 1)
+
+# Convert actual and predicted classes to factors
+actual_classes <- factor(validation_data$creditRisks, levels = c(1, 2))
+predicted_classes <- factor(predicted_classes, levels = c(1, 2))
+
+# Add predictions to validation_data for reference
+validation_data$predicted <- predicted_classes
+
+# Print the validation data (optional: remove if unnecessary)
+View(validation_data)
+
+# Generate confusion matrix
+conf_mat <- table(Predicted = predicted_classes, Actual = actual_classes)
+
+# Print confusion matrix
+cat("\nConfusion Matrix:\n")
+print(conf_mat)
+
+# Extract confusion matrix values safely
+true_positive <- ifelse("2" %in% rownames(conf_mat) && "2" %in% colnames(conf_mat), conf_mat["2", "2"], 0)
+true_negative <- ifelse("1" %in% rownames(conf_mat) && "1" %in% colnames(conf_mat), conf_mat["1", "1"], 0)
+false_positive <- ifelse("2" %in% rownames(conf_mat) && "1" %in% colnames(conf_mat), conf_mat["2", "1"], 0)
+false_negative <- ifelse("1" %in% rownames(conf_mat) && "2" %in% colnames(conf_mat), conf_mat["1", "2"], 0)
+
+# Calculate metrics with safe checks to avoid NaN
+accuracy <- (true_positive + true_negative) / sum(conf_mat)
+
+precision <- ifelse((true_positive + false_positive) > 0, 
+                    true_positive / (true_positive + false_positive), NA)
+
+recall <- ifelse((true_positive + false_negative) > 0, 
+                 true_positive / (true_positive + false_negative), NA)
+
+f1_score <- ifelse(!is.na(precision) && !is.na(recall) && (precision + recall) > 0,
+                   2 * (precision * recall) / (precision + recall), NA)
+
+# Print metrics
+cat("\nAccuracy:", round(accuracy, 3))
+cat("\nPrecision:", ifelse(is.na(precision), "Undefined", round(precision, 3)))
+cat("\nRecall:", ifelse(is.na(recall), "Undefined", round(recall, 3)))
+cat("\nF1 Score:", ifelse(is.na(f1_score), "Undefined", round(f1_score, 3)), "\n")
+
+# Print confusion matrix again (optional)
+cat("\nConfusion Matrix (Reprinted):\n")
+print(conf_mat)
+ ####                          
+# 1. Standardization (Z-score normalization)
+standardized_data <- scale(processed_data1)
+
+# 2. Normalization (Min-Max scaling)
+normalize <- function(x) {
+  (x - min(x)) / (max(x) - min(x))
+}
+normalized_data <- as.data.frame(lapply(processed_data1, normalize))
+
+# Optionally combine the transformed data back with 'creditRisks'
+final_standardized_data <- cbind(standardized_data, creditRisks = processed_data$creditRisks)
+final_normalized_data <- cbind(normalized_data, creditRisks = processed_data$creditRisks)
+# Getting details of the standardized data
+print(summary(final_standardized_data), digits = 2)
+
+plot(final_standardized_data)
+plot(final_normalized_data)
+##############ploting residual ###############################################################
+# Load necessary library
+library(ggplot2)
+library(caTools)
+library(nnet)
+# Example data: Replace 'normalized_data' and 'target_variable' with your dataset
+# normalized_data <- your_normalized_data_frame
+# target_variable <- your_target_variable
+str(final_normalized_data)
+str(standardized_data)
+# Fit the linear model
+mymodel<- lm(final_normalized_data$creditRisks ~ ., data = final_normalized_data)
+
+# Set up the diagnostic plots
+par(mfrow = c(2, 2)) # 2x2 layout for the plots
+
+# 1. Residuals vs Fitted
+plot(mymodel, which = 1, main = "Residuals vs Fitted")
+
+# 2. Normal Q-Q plot
+plot(mymodel, which = 2, main = "Normal Q-Q")
+
+# 3. Scale-Location plot
+plot(mymodel, which = 3, main = "Scale-Location")
+
+# 4. Residuals vs Leverage
+plot(mymodel, which = 5, main = "Residuals vs Leverage")
+
+# Reset layout
+par(mfrow = c(1, 1))
+####################### Model Regression with splitting (80%,20%)on Normalized DATA ###########
+# Load necessary library
+library(caret)
+
+#Normalization (Min-Max scaling)
+normalize <- function(x) {
+  (x - min(x)) / (max(x) - min(x))
+}
+selected_normalized_data <- as.data.frame(lapply(selected_featuresA, normalize))
+###################
+
+set.seed(123) # For reproducibility
+
+# Split the data into training (80%) and validation (20%) sets
+sample_indices <- sample(1:nrow(selected_normalized_data), size = 0.8 * nrow(selected_normalized_data))
+training_data <- selected_normalized_data[sample_indices, ]
+validation_data <- selected_normalized_data[-sample_indices, ]
+##################################NORMALIZED DATA GOOD LINEAR REGRESSION######################################################
+library(e1071)
+set.seed(123)
+# Split the data into training and validation sets (80/20 split)
+split <- sample.split(selected_normalized_data$creditRisks, SplitRatio = 0.8)
+training_data <- subset(selected_normalized_data, split == TRUE)
+validation_data <- subset(selected_normalized_data, split == FALSE)
+
+# Fit the multiple linear regression model using the training data
+unproc_Model <- lm(creditRisks ~ ., data = training_data)
+
+# Predict on the validation data
+predictions <- predict(unproc_Model, newdata = validation_data, type = 'response')
+
+# Convert predictions into binary classes based on a threshold (e.g., 0.5 for classification)
+threshold = 1.5
+predicted_classes = ifelse(predictions >= threshold, 2, 1)  # 1 for "Good", 0 for "Bad"
+
+# Ensure actual creditRisks is binary (0 or 1)
+actual_classes = factor(validation_data$creditRisks)
+predicted_classes = factor(predicted_classes, levels = levels(actual_classes))
+validation_data["predicted"]=predicted_classes
+
+# Generate confusion matrix
+conf_mat <- table(Predicted = predicted_classes, Actual = actual_classes)
+
+# Print confusion matrix
+cat("\nConfusion Matrix:\n")
+print(conf_mat)
+# Extract confusion matrix values
+true_positive <- conf_mat[2, 2]
+true_negative <- conf_mat[1, 1]
+false_positive <- conf_mat[2, 1]
+false_negative <- conf_mat[1, 2]
+
+# Calculate metrics
+accuracy <- (true_positive + true_negative) / sum(conf_mat)
+precision <- true_positive / (true_positive + false_positive)
+recall <- true_positive / (true_positive + false_negative)
+f1_score <- 2 * (precision * recall) / (precision + recall)
+
+# Print metrics
+cat("\nAccuracy:", accuracy)
+cat("\nPrecision:", precision)
+cat("\nRecall:", recall)
+cat("\nF1 Score:", f1_score, "\n")
+
+#
+# Print confusion matrix
+cat("\nConfusion Matrix:\n")
+print(conf_mat)
+######################################ROC THRESHOLD#############################
+# Load necessary libraries
+library(pROC)
+library(ggplot2)
+
+# Assuming you already have your predictions (probabilities) and actual classes
+# Example: predictions are probabilities from the neural network model
+# actual_classes is the true labels (binary)
+
+# If the model outputs class probabilities:
+# For example: 
+# predictions <- predict(model_nn, newdata = validation_data)
+
+# Create a ROC curve using pROC package
+roc_curve <- roc(actual_classes, predictions)
+
+# Plot the ROC curve
+plot(roc_curve, main = "ROC Curve", col = "blue", lwd = 2)
+
+# Add diagonal line representing random chance (AUC = 0.5)
+abline(a = 0, b = 1, col = "red", lty = 2)
+
+# Calculate and print the AUC (Area Under the Curve)
+auc(roc_curve)
+cat("\nAUC:", auc(roc_curve), "\n")
+
+# Optionally, visualize the ROC curve using ggplot2
+roc_df <- data.frame(
+  fpr = roc_curve$specificities,  # False Positive Rate (FPR)
+  tpr = roc_curve$sensitivities    # True Positive Rate (TPR)
+)
+
+ggplot(roc_df, aes(x = fpr, y = tpr)) +
+  geom_line(color = "blue", size = 1) + 
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red") +
+  theme_minimal() +
+  labs(title = "ROC Curve", x = "False Positive Rate (FPR)", y = "True Positive Rate (TPR)") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+########################################################################################
+# Step 2: Fit the linear regression model using training data
+mymodelS <- lm(creditRisks ~ ., data = training_data)
+summary(mymodelS)
+# Step 3: Identify and remove influential outliers using Cook's distance
+cooks_distances <- cooks.distance(mymodelS)
+influential_threshold <- 4 / nrow(training_data) # Threshold for influential points
+influential_points <- which(cooks_distances > influential_threshold)
+
+cat("Number of influential points removed:", length(influential_points), "\n")
+
+# Remove influential points from the training data
+cleaned_training_data <- training_data[-influential_points, ]
+
+# Step 4: Refit the linear regression model on the cleaned training data
+mymodelS_cleaned <- lm(creditRisks ~ ., data = cleaned_training_data)
+summary(mymodelS_cleaned)
+# Step 5: Set up the diagnostic plots for the cleaned model
+par(mfrow = c(2, 2)) # 2x2 layout for the plots
+
+# 1. Residuals vs Fitted
+plot(mymodelS_cleaned, which = 1, main = "Residuals vs Fitted (Cleaned)")
+
+# 2. Normal Q-Q plot
+plot(mymodelS_cleaned, which = 2, main = "Normal Q-Q (Cleaned)")
+
+# 3. Scale-Location plot
+plot(mymodelS_cleaned, which = 3, main = "Scale-Location (Cleaned)")
+
+# 4. Residuals vs Leverage
+plot(mymodelS_cleaned, which = 5, main = "Residuals vs Leverage (Cleaned)")
+
+# Step 6: Validate the cleaned model on the validation data
+validation_predictions <- predict(mymodelS_cleaned, newdata = validation_data)
+validation_actual <- validation_data$creditRisks
+                           # Load necessary library
+library(e1071)
+library(caTools)
+
+# Set a seed for reproducibility
+set.seed(123)
+
+# Split the data into training and validation sets (80/20 split)
+split <- sample.split(selected_featuresA$creditRisks, SplitRatio = 0.8)
+training_data <- subset(selected_featuresA, split == TRUE)
+validation_data <- subset(selected_featuresA, split == FALSE)
+
+# Fit the multiple linear regression model using the training data
+unproc_Model <- lm(creditRisks ~ ., data = training_data)
+
+# Predict on the validation data
+predictions <- predict(unproc_Model, newdata = validation_data, type = 'response')
+
+# Convert predictions into binary classes based on a threshold (1.5 used here)
+# Assumes 1 = "Good" (Low Risk) and 2 = "Bad" (High Risk)
+threshold <- 1.5
+predicted_classes <- ifelse(predictions >= threshold, 2, 1)
+
+# Convert actual and predicted classes to factors
+actual_classes <- factor(validation_data$creditRisks, levels = c(1, 2))
+predicted_classes <- factor(predicted_classes, levels = c(1, 2))
+
+# Add predictions to validation_data for reference
+validation_data$predicted <- predicted_classes
+
+# Print the validation data (optional: remove if unnecessary)
+View(validation_data)
+
+# Generate confusion matrix
+conf_mat <- table(Predicted = predicted_classes, Actual = actual_classes)
+
+# Print confusion matrix
+cat("\nConfusion Matrix:\n")
+print(conf_mat)
+
+# Extract confusion matrix values safely
+true_positive <- ifelse("2" %in% rownames(conf_mat) && "2" %in% colnames(conf_mat), conf_mat["2", "2"], 0)
+true_negative <- ifelse("1" %in% rownames(conf_mat) && "1" %in% colnames(conf_mat), conf_mat["1", "1"], 0)
+false_positive <- ifelse("2" %in% rownames(conf_mat) && "1" %in% colnames(conf_mat), conf_mat["2", "1"], 0)
+false_negative <- ifelse("1" %in% rownames(conf_mat) && "2" %in% colnames(conf_mat), conf_mat["1", "2"], 0)
+
+# Calculate metrics with safe checks to avoid NaN
+accuracy <- (true_positive + true_negative) / sum(conf_mat)
+
+precision <- ifelse((true_positive + false_positive) > 0, 
+                    true_positive / (true_positive + false_positive), NA)
+
+recall <- ifelse((true_positive + false_negative) > 0, 
+                 true_positive / (true_positive + false_negative), NA)
+
+f1_score <- ifelse(!is.na(precision) && !is.na(recall) && (precision + recall) > 0,
+                   2 * (precision * recall) / (precision + recall), NA)
+
+# Print metrics
+cat("\nAccuracy:", round(accuracy, 3))
+cat("\nPrecision:", ifelse(is.na(precision), "Undefined", round(precision, 3)))
+cat("\nRecall:", ifelse(is.na(recall), "Undefined", round(recall, 3)))
+cat("\nF1 Score:", ifelse(is.na(f1_score), "Undefined", round(f1_score, 3)), "\n")
+
+# Print confusion matrix again (optional)
+cat("\nConfusion Matrix (Reprinted):\n")
+print(conf_mat)
