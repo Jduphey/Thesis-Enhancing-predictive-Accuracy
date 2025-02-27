@@ -1,0 +1,3 @@
+A brief overview: Linear regression is a fundamental algorithm used to predict
+a continuous outcome variable based on one or more predictor variables. 
+Data preprocessing techniques such as normalization and handling missing values are crucial for linear regression.
