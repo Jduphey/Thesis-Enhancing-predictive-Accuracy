@@ -1,4 +1,4 @@
- It is a machine learning model inspired by the human brain structure,
+Neural networks is a machine learning model inspired by the human brain structure,
  designed to recognize patterns and make decisions. It consists of layers of neurons that
  transform input data into meaningful outputs through forward propagation, activation
  functions, and weight adjustments via backpropagation and optimization
